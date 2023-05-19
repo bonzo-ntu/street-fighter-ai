@@ -65,6 +65,16 @@ python test.py
 * ppo_ryu_3000000_steps_updated: 接近最终过拟合状态，几乎可以在最后一关第一轮中占据主导地位，胜率接近 100%，但泛化能力较弱。
 * ppo_ryu_7000000_steps_updated: 过拟合，在最后一关第一轮中完全占据主导地位，胜率 100%，但泛化能力差。
 
+
+### 障礙排除 
+
+當使用 `pip install -r requirements.txt` 安裝時出現錯誤 "error in gym setup command: 'extras_require' must be a dictionary whose values are strings or lists of strings containing valid project/version requirement specifiers."。  
+請做 `pip install setuptools==63.2.0` 以修正上述錯誤。  
+
+當執行 `python test.py` 並得到以下錯誤訊息 "raise NoSuchConfigException('No standard config is available.')
+pyglet.window.NoSuchConfigException: No standard config is available."  
+請執行 `xvfb-run -s "-screen 0 1400x900x24" python test.py`
+
 ### 训练模型
 
 如果想要训练自己的模型，可以在 `main/` 文件夹下运行 `train.py`。
