@@ -4,6 +4,21 @@
 
 本项目基于深度强化学习训练了一个用于通关《街头霸王·二：冠军特别版》（Street Fighter II Special Champion Edition）关底 BOSS 的智能 AI 代理。该智能代理完全基于游戏画面（RGB 像素值）进行决策，在该项目给定存档中最后一关的第一轮对局可以取得 100% 胜率（实际上出现了“过拟合”现象，详见[运行测试](#running-tests)部分的讨论）。
 
+### 環境執行
+先切到 `main` 資料夾，然後執行 `bash init.sh` 
+打開 `ipynb` 資料夾底下的 `try.ipynb` 跑看看  
+後續遇到問題再參考下面的障礙排除  
+
+
+### <font color=red>障礙排除</font>
+
+> 當使用 `pip install -r requirements.txt` 安裝時出現錯誤 "error in gym setup command: 'extras_require' must be  a dictionary whose values are strings or lists of strings containing valid project/version requirement specifiers."。  
+> 請做 `pip install setuptools==63.2.0` 以修正上述錯誤。  
+
+> 當執行 `python test.py` 並得到以下錯誤訊息 "raise NoSuchConfigException('No standard config is available.')
+> pyglet.window.NoSuchConfigException: No standard config is available."  
+> 請執行 `xvfb-run -s "-screen 0 1400x900x24" python test.py`
+
 ### 文件结构
 
 ```bash

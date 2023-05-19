@@ -33,7 +33,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
 
         self.total_timesteps = 0
 
-        self.full_hp = 176
+        self.full_hp = 176 # 總血量
         self.prev_player_health = self.full_hp
         self.prev_oppont_health = self.full_hp
 
@@ -68,7 +68,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
 
         # Render the game if rendering flag is set to True.
         if self.rendering:
-            self.env.render()
+            self.env.render(mode='rgb_array')
             time.sleep(0.01)
 
         for _ in range(self.num_step_frames - 1):
@@ -77,7 +77,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             obs, _reward, _done, info = self.env.step(action)
             self.frame_stack.append(obs[::2, ::2, :])
             if self.rendering:
-                self.env.render()
+                self.env.render(mode='rgb_array')
                 time.sleep(0.01)
 
         curr_player_health = info['agent_hp']

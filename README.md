@@ -66,6 +66,15 @@ Model weight files are stored in the `main/trained_models/` folder. The default 
 * ppo_ryu_3000000_steps_updated: Near the final overfitted state, almost dominate first round but barely generalizable.
 * ppo_ryu_7000000_steps_updated: Overfitted, dominates first round but not generalizable. 
 
+
+### Trouble Shooting
+When `pip install -r requirements.txt` failed with error "error in gym setup command: 'extras_require' must be a dictionary whose values are strings or lists of strings containing valid project/version requirement specifiers."  
+please do `pip install setuptools==63.2.0` to fix it.
+
+When you execute `python test.py` and get the error "raise NoSuchConfigException('No standard config is available.')
+pyglet.window.NoSuchConfigException: No standard config is available."  
+please do `xvfb-run -s "-screen 0 1400x900x24" python test.py`
+
 ### Training the Model
 
 If you want to train your own model, you can run `train.py` in the `main/` folder.
