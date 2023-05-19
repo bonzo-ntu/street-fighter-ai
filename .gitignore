@@ -21,11 +21,11 @@ images/
 !/main/street_fighter_custom_wrapper.py
 
 # Game Data
-/data/*
-!/data/Champion.Level12.RyuVsBison.state
-!/data/data.json
-!/data/metadata.json
-!/data/scenario.json
+#/data/*
+#!/data/Champion.Level12.RyuVsBison.state
+#!/data/data.json
+#!/data/metadata.json
+#!/data/scenario.json
 
 
 # Model Files
