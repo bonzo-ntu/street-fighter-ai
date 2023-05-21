@@ -25,6 +25,9 @@ NUM_ENV = 16
 LOG_DIR = 'logs'
 os.makedirs(LOG_DIR, exist_ok=True)
 
+# used for saving checkpoints and logs
+model_name = "PPO"
+
 # Linear scheduler
 def linear_schedule(initial_value, final_value=0.0):
 
@@ -86,7 +89,7 @@ def main():
     )
 
     # Set the save directory
-    save_dir = "trained_models_test"
+    save_dir = "trained_models_" + model_name
     os.makedirs(save_dir, exist_ok=True)
 
     # Load the model from file
@@ -103,7 +106,7 @@ def main():
     # Set up callbacks
     # Note that 1 timesetp = 6 frame
     checkpoint_interval = 31250 # checkpoint_interval * num_envs = total_steps_per_checkpoint
-    checkpoint_callback = CheckpointCallback(save_freq=checkpoint_interval, save_path=save_dir, name_prefix="ppo_ryu")
+    checkpoint_callback = CheckpointCallback(save_freq=checkpoint_interval, save_path=save_dir, name_prefix=model_name)
 
     # Writing the training logs from stdout to a file
     original_stdout = sys.stdout
@@ -112,7 +115,7 @@ def main():
         sys.stdout = log_file
     
         model.learn(
-            total_timesteps=int(100000000), # total_timesteps = stage_interval * num_envs * num_stages (1120 rounds)
+            total_timesteps=int(5000000), # total_timesteps = stage_interval * num_envs * num_stages (1120 rounds)
             callback=[checkpoint_callback]#, stage_increase_callback]
         )
         env.close()
@@ -121,7 +124,7 @@ def main():
     sys.stdout = original_stdout
 
     # Save the final model
-    model.save(os.path.join(save_dir, "ppo_sf2_ryu_final.zip"))
+    model.save(os.path.join(save_dir, model_name+".zip"))
 
 if __name__ == "__main__":
     main()
