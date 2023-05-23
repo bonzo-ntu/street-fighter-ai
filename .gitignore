@@ -15,7 +15,7 @@ images/
 /main/recordings/
 
 # Main scripts
-/main/*.py
+# /main/*.py
 !/main/test.py
 !/main/train.py
 !/main/street_fighter_custom_wrapper.py
@@ -30,7 +30,13 @@ images/
 
 # Model Files
 /main/trained_models/*
+/main/trained_models_*
+/PPO-delta/trained_models_*
 !/main/trained_models/ppo_ryu_2000000_steps_updated.*
 !/main/trained_models/ppo_ryu_2500000_steps_updated.*
 !/main/trained_models/ppo_ryu_3000000_steps_updated.*
 !/main/trained_models/ppo_ryu_7000000_steps_updated.*
+
+/main/logs/
+/PPO-delta/logs/
+/PPO-delta/opt_PPO-delta/
