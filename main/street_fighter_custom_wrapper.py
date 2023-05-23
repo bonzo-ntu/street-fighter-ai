@@ -64,6 +64,8 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         custom_done = False
 
         obs, _reward, _done, info = self.env.step(action)
+        # _done will always be false in the original environment, so we don't use it here.
+
         self.frame_stack.append(obs[::2, ::2, :])
 
         # Render the game if rendering flag is set to True.
