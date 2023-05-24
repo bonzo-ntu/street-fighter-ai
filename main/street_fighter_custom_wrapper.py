@@ -17,6 +17,11 @@ import collections
 import gym
 import numpy as np
 
+# --> bonzo add
+def downsample(input, rate=2):
+    return input[::rate, ::rate, :]
+# <--
+
 # Custom environment wrapper
 class StreetFighterCustomWrapper(gym.Wrapper):
     def __init__(self, env, reset_round=True, rendering=False):
@@ -43,6 +48,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         self.rendering = rendering
     
     def _stack_observation(self):
+        # 拿 frame 2 的 R + frame 5 的 G + frame 8 的 B 串在一起
         return np.stack([self.frame_stack[i * 3 + 2][:, :, i] for i in range(3)], axis=-1)
 
     def reset(self):
@@ -56,28 +62,44 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         # Clear the frame stack and add the first observation [num_frames] times
         self.frame_stack.clear()
         for _ in range(self.num_frames):
-            self.frame_stack.append(observation[::2, ::2, :])
+            # 放了 9 個一樣的畫面
+            # --> bonzo replace
+            # self.frame_stack.append(observation[::2, ::2, :])
+            self.frame_stack.append(downsample(observation)) # down sample
+            # <--
 
-        return np.stack([self.frame_stack[i * 3 + 2][:, :, i] for i in range(3)], axis=-1)
+        # --> bonzo replace
+        # return np.stack([self.frame_stack[i * 3 + 2][:, :, i] for i in range(3)], axis=-1)
+        return self._stack_observation()
+        # <--
 
     def step(self, action):
         custom_done = False
 
         obs, _reward, _done, info = self.env.step(action)
-        # _done will always be false in the original environment, so we don't use it here.
+        # --> bonzo replace
+        # self.frame_stack.append(obs[::2, ::2, :])
+        self.frame_stack.append(downsample(obs))
+        # <--
 
-        self.frame_stack.append(obs[::2, ::2, :])
-
+        # 做 action 之前先渲染畫面
         # Render the game if rendering flag is set to True.
         if self.rendering:
             self.env.render(mode='rgb_array')
-            time.sleep(0.01)
+            time.sleep(0.01) # 1 個 frame 是 0.0166 秒
 
+
+        # 同個 action 持續 6 個 frame
         for _ in range(self.num_step_frames - 1):
             
             # Keep the button pressed for (num_step_frames - 1) frames.
             obs, _reward, _done, info = self.env.step(action)
-            self.frame_stack.append(obs[::2, ::2, :])
+            # --> bonzo replace
+            #self.frame_stack.append(obs[::2, ::2, :])
+            self.frame_stack.append(downsample(obs)) # 記錄相同 action 之下的 6 個 frame
+            # <--
+
+            # 渲染這 6 個 frame
             if self.rendering:
                 self.env.render(mode='rgb_array')
                 time.sleep(0.01)
