@@ -14,19 +14,19 @@ import os
 import sys
 
 import retro
-from stable_baselines3 import PPO
+from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from street_fighter_custom_wrapper import StreetFighterCustomWrapper
 
-NUM_ENV = 16
+NUM_ENV = 8
 LOG_DIR = 'logs'
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # used for saving checkpoints and logs
-model_name = "PPO"
+model_name = "DQN"
 
 # Linear scheduler
 def linear_schedule(initial_value, final_value=0.0):
@@ -46,9 +46,11 @@ def make_env(game, state, seed=0):
         env = retro.make(
             game=game, 
             state=state, 
-            use_restricted_actions=retro.Actions.FILTERED, 
+            use_restricted_actions=retro.Actions.DISCRETE, 
             obs_type=retro.Observations.IMAGE    
         )
+        # print("button_combos", env.button_combos)
+        # print("buttons", env.buttons)
         env = StreetFighterCustomWrapper(env)
         env = Monitor(env)
         env.seed(seed)
@@ -69,24 +71,25 @@ def main():
 
     # Set linear scheduler for clip range
     # Start
-    clip_range_schedule = linear_schedule(0.15, 0.025)
+    # clip_range_schedule = linear_schedule(0.15, 0.025)
 
     # fine-tune
     # clip_range_schedule = linear_schedule(0.075, 0.025)
 
-    model = PPO(
+    model = DQN(
         "CnnPolicy", 
         env,
         device="cuda", 
         verbose=1,
-        n_steps=512,
+        # n_steps=512,
         batch_size=512,
-        n_epochs=4,
+        # n_epochs=4,
         gamma=0.94,
         learning_rate=lr_schedule,
-        clip_range=clip_range_schedule,
+        # clip_range=clip_range_schedule,
         tensorboard_log="logs"
     )
+
 
     # Set the save directory
     save_dir = "trained_models_" + model_name
@@ -115,7 +118,7 @@ def main():
         sys.stdout = log_file
     
         model.learn(
-            total_timesteps=int(5000000), # total_timesteps = stage_interval * num_envs * num_stages (1120 rounds)
+            total_timesteps=int(3000000), # total_timesteps = stage_interval * num_envs * num_stages (1120 rounds)
             callback=[checkpoint_callback]#, stage_increase_callback]
         )
         env.close()
