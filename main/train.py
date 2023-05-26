@@ -12,6 +12,7 @@
 
 import os
 import sys
+from args import get_args
 
 import retro
 from stable_baselines3 import PPO
@@ -20,13 +21,6 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from street_fighter_custom_wrapper import StreetFighterCustomWrapper
-
-NUM_ENV = 16
-LOG_DIR = 'logs'
-os.makedirs(LOG_DIR, exist_ok=True)
-
-# used for saving checkpoints and logs
-model_name = "PPO"
 
 # Linear scheduler
 def linear_schedule(initial_value, final_value=0.0):
@@ -49,38 +43,44 @@ def make_env(game, state, seed=0):
             use_restricted_actions=retro.Actions.FILTERED, 
             obs_type=retro.Observations.IMAGE    
         )
-        env = StreetFighterCustomWrapper(env)
+        env = StreetFighterCustomWrapper(env, reset_round=False)
         env = Monitor(env)
         env.seed(seed)
         return env
     return _init
 
-def main():
-    # Set up the environment and model
-    game = "StreetFighterIISpecialChampionEdition-Genesis"
-    env = SubprocVecEnv([make_env(game, state="Champion.Level12.RyuVsBison", seed=i) for i in range(NUM_ENV)])
+def main(args):
+    # Hyperparameters
+    NUM_ENV = args.num_env # 16
+    
+    # used for saving checkpoints and logs
+    LOG_DIR = args.log_dir
+    os.makedirs(LOG_DIR, exist_ok=True)
+    model_name = args.train_name
 
-    # Set linear schedule for learning rate
+    # Set up the environment and model
+    game = args.game #"StreetFighterIISpecialChampionEdition-Genesis"
+    env = SubprocVecEnv([make_env(game, state=args.state, seed=i) for i in range(NUM_ENV)])
+
     # Start
+    # Set linear scheduler for clip range
+    clip_range_schedule = linear_schedule(0.15, 0.025)
+    # Set linear schedule for learning rate
     lr_schedule = linear_schedule(2.5e-4, 2.5e-6)
 
     # fine-tune
     # lr_schedule = linear_schedule(5.0e-5, 2.5e-6)
-
-    # Set linear scheduler for clip range
-    # Start
-    clip_range_schedule = linear_schedule(0.15, 0.025)
-
     # fine-tune
     # clip_range_schedule = linear_schedule(0.075, 0.025)
 
+    n_steps = args.n_steps # 512
     model = PPO(
         "CnnPolicy", 
         env,
         device="cuda", 
         verbose=1,
-        n_steps=512,
-        batch_size=512,
+        n_steps=n_steps,
+        batch_size=n_steps*NUM_ENV,
         n_epochs=4,
         gamma=0.94,
         learning_rate=lr_schedule,
@@ -105,7 +105,9 @@ def main():
 
     # Set up callbacks
     # Note that 1 timesetp = 6 frame
-    checkpoint_interval = 31250 # checkpoint_interval * num_envs = total_steps_per_checkpoint
+    total_timesteps = args.total_timesteps # 10000000
+    check_timesteps = args.check_timesteps # 500000
+    checkpoint_interval = check_timesteps / NUM_ENV # checkpoint_interval * num_envs = total_steps_per_checkpoint
     checkpoint_callback = CheckpointCallback(save_freq=checkpoint_interval, save_path=save_dir, name_prefix=model_name)
 
     # Writing the training logs from stdout to a file
@@ -115,8 +117,8 @@ def main():
         sys.stdout = log_file
     
         model.learn(
-            total_timesteps=int(5000000), # total_timesteps = stage_interval * num_envs * num_stages (1120 rounds)
-            callback=[checkpoint_callback]#, stage_increase_callback]
+            total_timesteps=int(total_timesteps), # total_timesteps = stage_interval * num_envs * num_stages (1120 rounds)
+            callback=[checkpoint_callback] #, stage_increase_callback]
         )
         env.close()
 
@@ -127,4 +129,5 @@ def main():
     model.save(os.path.join(save_dir, model_name+".zip"))
 
 if __name__ == "__main__":
-    main()
+    args = get_args()
+    main(args)
