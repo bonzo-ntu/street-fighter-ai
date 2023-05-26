@@ -106,8 +106,11 @@ class StreetFighterCustomWrapper(gym.Wrapper):
 
         curr_player_health = info['agent_hp']
         curr_oppont_health = info['enemy_hp']
+        round_countdown = info['round_countdown']
         
         self.total_timesteps += self.num_step_frames
+
+        # custom_done: 用於訓練最後一關第一局
         
         # Game is over and player loses.
         if curr_player_health < 0:
@@ -130,6 +133,11 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             self.prev_player_health = curr_player_health
             self.prev_oppont_health = curr_oppont_health
             custom_done = False
+        
+        # end when round_countdown <= 0
+        # this info does not match with the time on the screen
+        if round_countdown <= 0:
+            custom_done = True
 
         # When reset_round flag is set to False (never reset), the session should always keep going.
         if not self.reset_round:
