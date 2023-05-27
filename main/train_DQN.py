@@ -150,7 +150,7 @@ if __name__=='__main__':
     # Set up callbacks
     # Note that 1 timesetp = 6 frame
     checkpoint_interval = 31250 # checkpoint_interval * num_envs = total_steps_per_checkpoint
-    checkpoint_callback = CheckpointCallback(save_freq=checkpoint_interval, save_path=save_dir, name_prefix=model_name)
+    checkpoint_callback = CheckpointCallback(save_freq=checkpoint_interval, save_path=f"{save_dir}/{run.id}", name_prefix=model_name)
     wandb_callback = WandbCallback(
         gradient_save_freq=1000,
         model_save_freq = checkpoint_interval,
@@ -160,7 +160,7 @@ if __name__=='__main__':
 
     # Writing the training logs from stdout to a file
     original_stdout = sys.stdout
-    log_file_path = os.path.join(save_dir, "training_log.txt")
+    log_file_path = os.path.join(f"{save_dir}/{run.id}", "training_log.txt")
     with open(log_file_path, 'w') as log_file:
         sys.stdout = log_file
     
