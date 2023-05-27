@@ -150,8 +150,8 @@ if __name__=='__main__':
     # Set up callbacks
     # Note that 1 timesetp = 6 frame
     checkpoint_interval = 31250 # checkpoint_interval * num_envs = total_steps_per_checkpoint
-    #checkpoint_callback = CheckpointCallback(save_freq=checkpoint_interval, save_path=save_dir, name_prefix=model_name)
-    checkpoint_callback = WandbCallback(
+    checkpoint_callback = CheckpointCallback(save_freq=checkpoint_interval, save_path=save_dir, name_prefix=model_name)
+    wandb_callback = WandbCallback(
         gradient_save_freq=1000,
         model_save_freq = checkpoint_interval,
         model_save_path=f"{save_dir}/{run.id}",
@@ -166,7 +166,7 @@ if __name__=='__main__':
     
         model.learn(
             total_timesteps=config['total_timesteps'], # total_timesteps = stage_interval * num_envs * num_stages (1120 rounds)
-            callback=[checkpoint_callback]#, stage_increase_callback]
+            callback=[wandb_callback, checkpoint_callback],#, stage_increase_callback]
         )
         env.close()
 
