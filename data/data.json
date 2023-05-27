@@ -55,6 +55,10 @@
         "enemy_status": {
             "address": 16745090,
             "type": ">u2"
+        },
+        "level": {
+            "address": 16750276,
+            "type": ">d2"
         }
     }
 }
