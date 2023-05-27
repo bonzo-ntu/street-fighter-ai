@@ -13,5 +13,7 @@ def get_args():
     # for store results
     parser.add_argument('--log_dir', type=str, default='logs', help='Directory to save logs')
     parser.add_argument('--train_name', type=str, default='PPO', help='Name to be added to the path that saves models')
+    # for drawing
+    parser.add_argument('--disable_wandb', '-nwb', action='store_true', help='Disable wandb to draw')
 
     return parser.parse_args()
