@@ -28,6 +28,8 @@ class StreetFighterCustomWrapper(gym.Wrapper):
     def __init__(self, env, rd_type="default", reset_round=True, rendering=False):
         super(StreetFighterCustomWrapper, self).__init__(env)
         self.env = env
+        self.env.reset()
+        self.init_info = self.get_curr_all_info()
 
         # Use a deque to store the last 9 frames
         self.num_frames = 9
@@ -39,13 +41,11 @@ class StreetFighterCustomWrapper(gym.Wrapper):
 
         self.total_timesteps = 0
 
-        self.full_hp = 176 # 總血量
+        self.full_hp = self.init_info["agent_hp"] # 總血量
+
+        # rd_info 為了計算 reward 用的資訊
         self.rd_info = {}
-        # 初始化血量
-        self.rd_info["prev_player_health"] = self.full_hp
-        self.rd_info["prev_oppont_health"] = self.full_hp
-        self.rd_info["curr_player_health"] = self.full_hp
-        self.rd_info["curr_oppont_health"] = self.full_hp
+        self.init_rd_info()
 
         self.rewarder = CustomRewarder(rd_type=rd_type, rd_coeff=self.reward_coeff, full_hp=self.full_hp, init_info_dict=self.rd_info)
         self.observation_space = gym.spaces.Box(low=0, high=255, shape=(100, 128, 3), dtype=np.uint8)
@@ -60,12 +60,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
     def reset(self):
         observation = self.env.reset()
 
-        # 初始化血量
-        self.rd_info["prev_player_health"] = self.full_hp
-        self.rd_info["prev_oppont_health"] = self.full_hp
-        self.rd_info["curr_player_health"] = self.full_hp
-        self.rd_info["curr_oppont_health"] = self.full_hp
-
+        self.init_rd_info()
         self.total_timesteps = 0
         
         # Clear the frame stack and add the first observation [num_frames] times
@@ -116,7 +111,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         self.rd_info["curr_player_health"] = info['agent_hp']
         self.rd_info["curr_oppont_health"] = info['enemy_hp']
 
-        round_countdown = info['round_countdown']
+        self.rd_info["curr_countdown"] = info['round_countdown']
         
         self.total_timesteps += self.num_step_frames
 
@@ -149,13 +144,29 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         
         # end when round_countdown <= 0
         # this info does not match with the time on the screen
-        if round_countdown <= 0:
+        if self.rd_info["curr_countdown"] <= 0:
             custom_done = True
 
         # When reset_round flag is set to False (never reset), the session should always keep going.
         if not self.reset_round:
             custom_done = False
              
-        # Max reward is 6 * full_hp = 1054 (damage * 3 + winning_reward * 3) norm_coefficient = 0.001
-        return self._stack_observation(), 0.001 * custom_reward, custom_done, info # reward normalization
+        # Max reward is 3 * full_hp = 528, norm_coefficient = 0.001, MAX_REWARD = 0.528
+        return self._stack_observation(), custom_reward, custom_done, info # reward normalization
+    
+    # Tools for Rewarder
+    def init_rd_info(self):
+        # 初始化血量
+        self.rd_info["prev_player_health"] = self.full_hp
+        self.rd_info["prev_oppont_health"] = self.full_hp
+        self.rd_info["curr_player_health"] = self.full_hp
+        self.rd_info["curr_oppont_health"] = self.full_hp
+        # 初始化倒數計時
+        self.rd_info["init_countdown"] = self.init_info["round_countdown"]
+        self.rd_info["curr_countdown"] = self.init_info["round_countdown"]
+
+
+    # Tools
+    def get_curr_all_info(self):
+        return self.env.data.lookup_all()
     
