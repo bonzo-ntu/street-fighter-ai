@@ -119,7 +119,7 @@ def main(args):
         # model_save_freq = checkpoint_interval,
         # model_save_path=f"{save_dir}/{run.id}",
         # verbose=1,
-    )
+    ) if not args.disable_wandb else None
 
     # Writing the training logs from stdout to a file
     original_stdout = sys.stdout
@@ -142,27 +142,28 @@ def main(args):
 if __name__ == "__main__":
     args = get_args()
 
-    if 'WANDB_BASE_URL' in os.environ:
-        del os.environ['WANDB_BASE_URL']
-    # 先 login, 如果要切換帳號可以在 command line 打 `wandb login --relogin`
-    # 這行會要求你去 https://wandb.ai/authorize 拿取屬於自己的 api key
-    # 複製 api key 貼上 (即使是在同個 team 不同人會拿到不同的 key)
-    wandb.login()
+    if not args.disable_wandb:
+        if 'WANDB_BASE_URL' in os.environ:
+            del os.environ['WANDB_BASE_URL']
+        # 先 login, 如果要切換帳號可以在 command line 打 `wandb login --relogin`
+        # 這行會要求你去 https://wandb.ai/authorize 拿取屬於自己的 api key
+        # 複製 api key 貼上 (即使是在同個 team 不同人會拿到不同的 key)
+        wandb.login()
 
-    # 我們的 team 是 'ntuai2023'，這個要設在 `wandb.init()` 的 `entity` 參數
-    # team 底下的 project 是`sf2`
-    config = {
-        'algo':args.train_name,
-        'total_timesteps':args.total_timesteps,
-        'stage':'Level12.RyuVsBison',
-    }
-    WANDB_PROJECT='sf2'
-    run = wandb.init(project=WANDB_PROJECT, 
-                    entity='ntuai2023', 
-                    config=config,
-                    sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-                    monitor_gym=True,  # auto-upload the videos of agents playing the game
-                    save_code=True,  # optional
-                    settings=wandb.Settings(start_method="fork"))
+        # 我們的 team 是 'ntuai2023'，這個要設在 `wandb.init()` 的 `entity` 參數
+        # team 底下的 project 是`sf2`
+        config = {
+            'algo':args.train_name,
+            'total_timesteps':args.total_timesteps,
+            'stage':'Level12.RyuVsBison',
+        }
+        WANDB_PROJECT='sf2'
+        run = wandb.init(project=WANDB_PROJECT, 
+                        entity='ntuai2023', 
+                        config=config,
+                        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+                        monitor_gym=True,  # auto-upload the videos of agents playing the game
+                        save_code=True,  # optional
+                        settings=wandb.Settings(start_method="fork"))
 
     main(args)
