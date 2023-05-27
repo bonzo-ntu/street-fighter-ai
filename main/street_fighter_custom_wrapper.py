@@ -13,6 +13,7 @@
 import math
 import time
 import collections
+from rewarder import CustomRewarder
 
 import gym
 import numpy as np
@@ -24,7 +25,7 @@ def downsample(input, rate=2):
 
 # Custom environment wrapper
 class StreetFighterCustomWrapper(gym.Wrapper):
-    def __init__(self, env, reset_round=True, rendering=False):
+    def __init__(self, env, rd_type="default", reset_round=True, rendering=False):
         super(StreetFighterCustomWrapper, self).__init__(env)
         self.env = env
 
@@ -39,9 +40,14 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         self.total_timesteps = 0
 
         self.full_hp = 176 # 總血量
-        self.prev_player_health = self.full_hp
-        self.prev_oppont_health = self.full_hp
+        self.rd_info = {}
+        # 初始化血量
+        self.rd_info["prev_player_health"] = self.full_hp
+        self.rd_info["prev_oppont_health"] = self.full_hp
+        self.rd_info["curr_player_health"] = self.full_hp
+        self.rd_info["curr_oppont_health"] = self.full_hp
 
+        self.rewarder = CustomRewarder(rd_type=rd_type, rd_coeff=self.reward_coeff, full_hp=self.full_hp, init_info_dict=self.rd_info)
         self.observation_space = gym.spaces.Box(low=0, high=255, shape=(100, 128, 3), dtype=np.uint8)
         
         self.reset_round = reset_round
@@ -53,9 +59,12 @@ class StreetFighterCustomWrapper(gym.Wrapper):
 
     def reset(self):
         observation = self.env.reset()
-        
-        self.prev_player_health = self.full_hp
-        self.prev_oppont_health = self.full_hp
+
+        # 初始化血量
+        self.rd_info["prev_player_health"] = self.full_hp
+        self.rd_info["prev_oppont_health"] = self.full_hp
+        self.rd_info["curr_player_health"] = self.full_hp
+        self.rd_info["curr_oppont_health"] = self.full_hp
 
         self.total_timesteps = 0
         
@@ -104,34 +113,38 @@ class StreetFighterCustomWrapper(gym.Wrapper):
                 self.env.render(mode='rgb_array')
                 time.sleep(0.01)
 
-        curr_player_health = info['agent_hp']
-        curr_oppont_health = info['enemy_hp']
+        self.rd_info["curr_player_health"] = info['agent_hp']
+        self.rd_info["curr_oppont_health"] = info['enemy_hp']
+
         round_countdown = info['round_countdown']
         
         self.total_timesteps += self.num_step_frames
 
+        # 算 reward 之前，先更新 Rewarder 的 rd_info
+        self.rewarder.update(self.rd_info)
+
+        #####  計算 Reward  #####
         # custom_done: 用於訓練最後一關第一局
-        
         # Game is over and player loses.
-        if curr_player_health < 0:
-            custom_reward = -math.pow(self.full_hp, (curr_oppont_health + 1) / (self.full_hp + 1))    # Use the remaining health points of opponent as penalty. 
+        if self.rd_info["curr_player_health"] < 0:
+            custom_reward = self.rewarder.lose()    # Use the remaining health points of opponent as penalty. 
                                                    # If the opponent also has negative health points, it's a even game and the reward is +1.
             custom_done = True
 
         # Game is over and player wins.
-        elif curr_oppont_health < 0:
+        elif self.rd_info["curr_oppont_health"] < 0:
             # custom_reward = curr_player_health * self.reward_coeff # Use the remaining health points of player as reward.
                                                                    # Multiply by reward_coeff to make the reward larger than the penalty to avoid cowardice of agent.
 
             # custom_reward = math.pow(self.full_hp, (5940 - self.total_timesteps) / 5940) * self.reward_coeff # Use the remaining time steps as reward.
-            custom_reward = math.pow(self.full_hp, (curr_player_health + 1) / (self.full_hp + 1)) * self.reward_coeff
+            custom_reward = self.rewarder.win()
             custom_done = True
 
         # While the fighting is still going on
         else:
-            custom_reward = self.reward_coeff * (self.prev_oppont_health - curr_oppont_health) - (self.prev_player_health - curr_player_health)
-            self.prev_player_health = curr_player_health
-            self.prev_oppont_health = curr_oppont_health
+            custom_reward = self.rewarder.fight()
+            self.rd_info["prev_player_health"] = self.rd_info["curr_player_health"]
+            self.rd_info["prev_oppont_health"] = self.rd_info["curr_oppont_health"]
             custom_done = False
         
         # end when round_countdown <= 0
