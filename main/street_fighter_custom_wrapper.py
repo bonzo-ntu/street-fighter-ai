@@ -193,7 +193,6 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             self.stages = 0
             custom_done = True
         if result:
-            print("==== END ====")
             self.game_end_process()
         
         # When reset_round flag is set to False (never reset), the session should always keep going.
