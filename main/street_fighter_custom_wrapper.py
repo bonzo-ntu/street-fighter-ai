@@ -223,8 +223,12 @@ class StreetFighterCustomWrapper(gym.Wrapper):
     
     def wait_next_round(self, action):
         _, _, _, info = self.env.step(action)
+        prev_info = info
+        _, _, _, info = self.env.step(action)
         # 等待 HP 恢復
-        while not (info['agent_hp'] == self.full_hp and info['enemy_hp'] == self.full_hp and info['enemy_status'] != 0):
+        while not (info['agent_hp'] == self.full_hp and info['enemy_hp'] == self.full_hp and info['enemy_status'] != 0 and \
+                   prev_info['round_countdown'] - info['round_countdown'] != 0):
+            prev_info = info
             _, _, _, info = self.env.step(action)
     
     # Tools for Rewarder
