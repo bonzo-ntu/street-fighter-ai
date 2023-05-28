@@ -119,7 +119,7 @@ if __name__=='__main__':
         env,
         device="cuda", 
         verbose=1,
-        buffer_size = 10_000,
+        buffer_size = 20_000,
         # n_steps=512,
         #train_freq=(128, "step"),
         batch_size=512,

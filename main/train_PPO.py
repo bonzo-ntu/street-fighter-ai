@@ -22,6 +22,11 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from street_fighter_custom_wrapper import StreetFighterCustomWrapper
 
+import wandb
+from wandb.integration.sb3 import WandbCallback
+import os
+
+
 # Linear scheduler
 def linear_schedule(initial_value, final_value=0.0):
 
@@ -43,7 +48,7 @@ def make_env(game, state, seed=0):
             use_restricted_actions=retro.Actions.FILTERED, 
             obs_type=retro.Observations.IMAGE    
         )
-        env = StreetFighterCustomWrapper(env, reset_round=False)
+        env = StreetFighterCustomWrapper(env)
         env = Monitor(env)
         env.seed(seed)
         return env
@@ -108,7 +113,13 @@ def main(args):
     total_timesteps = args.total_timesteps # 10000000
     check_timesteps = args.check_timesteps # 500000
     checkpoint_interval = check_timesteps / NUM_ENV # checkpoint_interval * num_envs = total_steps_per_checkpoint
-    checkpoint_callback = CheckpointCallback(save_freq=checkpoint_interval, save_path=save_dir, name_prefix=model_name)
+    checkpoint_callback1 = CheckpointCallback(save_freq=checkpoint_interval, save_path=save_dir, name_prefix=model_name)
+    checkpoint_callback2 = WandbCallback(
+        gradient_save_freq=1000,
+        # model_save_freq = checkpoint_interval,
+        # model_save_path=f"{save_dir}/{run.id}",
+        # verbose=1,
+    ) if not args.disable_wandb else None
 
     # Writing the training logs from stdout to a file
     original_stdout = sys.stdout
@@ -118,7 +129,7 @@ def main(args):
     
         model.learn(
             total_timesteps=int(total_timesteps), # total_timesteps = stage_interval * num_envs * num_stages (1120 rounds)
-            callback=[checkpoint_callback] #, stage_increase_callback]
+            callback=[checkpoint_callback1, checkpoint_callback2] if not args.disable_wandb else [checkpoint_callback1] #, stage_increase_callback]
         )
         env.close()
 
@@ -130,4 +141,29 @@ def main(args):
 
 if __name__ == "__main__":
     args = get_args()
+
+    if not args.disable_wandb:
+        if 'WANDB_BASE_URL' in os.environ:
+            del os.environ['WANDB_BASE_URL']
+        # 先 login, 如果要切換帳號可以在 command line 打 `wandb login --relogin`
+        # 這行會要求你去 https://wandb.ai/authorize 拿取屬於自己的 api key
+        # 複製 api key 貼上 (即使是在同個 team 不同人會拿到不同的 key)
+        wandb.login()
+
+        # 我們的 team 是 'ntuai2023'，這個要設在 `wandb.init()` 的 `entity` 參數
+        # team 底下的 project 是`sf2`
+        config = {
+            'algo':args.train_name,
+            'total_timesteps':args.total_timesteps,
+            'stage':'Level12.RyuVsBison',
+        }
+        WANDB_PROJECT='sf2'
+        run = wandb.init(project=WANDB_PROJECT, 
+                        entity='ntuai2023', 
+                        config=config,
+                        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+                        monitor_gym=True,  # auto-upload the videos of agents playing the game
+                        save_code=True,  # optional
+                        settings=wandb.Settings(start_method="fork"))
+
     main(args)
