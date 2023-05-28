@@ -178,7 +178,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             self.tmp_lose_rounds += 1
             self.init_rd_info()
             round_end = True
-            print("lose")
+            # print("lose")
 
         # Round結束，玩家贏了
         elif self.rd_info["curr_oppont_health"] < 0:
@@ -187,7 +187,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             self.tmp_win_rounds += 1
             self.init_rd_info()
             round_end = True
-            print("Win")
+            # print("Win")
 
         # While the fighting is still going on
         else:
