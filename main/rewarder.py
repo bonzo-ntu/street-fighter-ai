@@ -79,6 +79,10 @@ class CustomRewarder:
     ## Update curr_info_dict
     def update(self, info_dict):
         self.curr_info_dict = info_dict
+        # 只更新除 'level' 之外的 data
+        ##old_level = self.curr_info_dict['level']
+        #self.curr_info_dict = {k:v for k, v in info_dict.items() if k != 'level'}
+        #self.curr_info_dict['level'] = old_level
         assert keys_are_in_dict(self.essential_infokeys, self.curr_info_dict)
     
     ## Get normalized rewards
