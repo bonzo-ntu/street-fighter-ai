@@ -17,6 +17,7 @@ from rewarder import CustomRewarder
 
 import gym
 import numpy as np
+import cv2
 
 NUM_STAGES = 12
 WIN_GAME, LOSE_GAME = 1, -1
@@ -33,14 +34,16 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         assert reset_round in [0, 1, 3] # [no_reset, 1/1, 3/2]
         super(StreetFighterCustomWrapper, self).__init__(env)
         self.env = env
-        self.env.reset()
+        self.prev_obs = self.preprocess(self.env.reset())
         self.init_info = self.get_curr_all_info()
 
-        # Use a deque to store the last 9 frames
-        self.num_frames = 9
+        # Use a deque to store the last 5 frame difference (current frame - previous frame)
+        # that equals 6 frams information. 
+        self.num_frames = 5
         self.frame_stack = collections.deque(maxlen=self.num_frames)
 
-        self.num_step_frames = 6
+        # the shortes RYU's move has frame counts == 3
+        self.num_step_frames = 3 
 
         self.reward_coeff = 3.0
 
@@ -52,8 +55,10 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         self.rd_info = {}
         self.init_rd_info()
 
+        # CustomRewarder.get_available_rd_types()
+        # ["default", "time", "score", "time+score"]
         self.rewarder = CustomRewarder(rd_type=rd_type, rd_coeff=self.reward_coeff, full_hp=self.full_hp, init_info_dict=self.rd_info)
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(100, 128, 3), dtype=np.uint8)
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 1), dtype=np.uint8)
         
         self.reset_round = reset_round
         self.rendering = rendering
@@ -71,10 +76,30 @@ class StreetFighterCustomWrapper(gym.Wrapper):
     
     def _stack_observation(self):
         # 拿 frame 2 的 R + frame 5 的 G + frame 8 的 B 串在一起
-        return np.stack([self.frame_stack[i * 3 + 2][:, :, i] for i in range(3)], axis=-1)
+        # return np.stack([self.frame_stack[i * 3 + 2][:, :, i] for i in range(3)], axis=-1)
+
+        # 全部拿來用
+        return self.frame_stack
+
+    def preprocess(self, observation): 
+        # Grayscaling 
+        gray = cv2.cvtColor(observation, cv2.COLOR_BGR2GRAY)
+        # Resize 
+        resize = cv2.resize(gray, (84,84), interpolation=cv2.INTER_CUBIC)
+        # Add the channels value
+        channels = np.reshape(resize, (84,84,1))
+        return channels 
+
+
+    # 根據記錄的最後一個 process 過的畫面，跟現在process過的畫面算 diff
+    def diff_with_prev_obs(self, curr_obs):
+        diff_obs = curr_obs - self.prev_obs
+        self.prev_obs = curr_obs
+        return diff_obs
 
     def reset(self):
-        observation = self.env.reset()
+        #obs = self.env.reset()
+        self.prev_obs = self.preprocess(self.env.reset())
 
         # 關卡重置
         self.init_info = self.get_curr_all_info()
@@ -83,12 +108,16 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         
         # Clear the frame stack and add the first observation [num_frames] times
         self.frame_stack.clear()
+
+        #self.frame_stack.append(self.preprocess(prev_obs))
+        no_action =  [0,0,0,0,0,0,0,0,0,0,0,0]
         for _ in range(self.num_frames):
-            # 放了 9 個一樣的畫面
-            # --> bonzo replace
-            # self.frame_stack.append(observation[::2, ::2, :])
-            self.frame_stack.append(downsample(observation)) # down sample
-            # <--
+            obs, dummy_reward, dummy_done, info  = self.env.step(no_action)
+            curr_obs = self.preprocess(obs)
+            diff_obs = self.diff_with_prev_obs(curr_obs)
+
+            # 初始放了 5 個前後 frame 的差，等價 6 個 frame
+            self.frame_stack.append(diff_obs) # down sample
 
         # --> bonzo replace
         # return np.stack([self.frame_stack[i * 3 + 2][:, :, i] for i in range(3)], axis=-1)
@@ -99,9 +128,9 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         custom_done = False
         is_reward_stage = False
         done_status = 0 # 用於回傳給外部計算勝率用的 done_status
-        round_end = False
 
         obs, _reward, _done, info = self.env.step(action)
+        curr_obs = self.preprocess(obs)
         ## "永不 reset" 情況下，但是全通關，就要 reset
         if not self.reset_round and self.stages >= NUM_STAGES:
             info["done_status"] = 1
@@ -115,7 +144,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             #print("SKIP")
         # --> bonzo replace
         # self.frame_stack.append(obs[::2, ::2, :])
-        self.frame_stack.append(downsample(obs))
+        self.frame_stack.append(self.diff_with_prev_obs(curr_obs))
         # <--
 
         # 做 action 之前先渲染畫面
@@ -125,15 +154,14 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             time.sleep(0.01) # 1 個 frame 是 0.0166 秒
 
 
-        # 同個 action 持續 6 個 frame
+        # 同個 action 持續 3 個 frame
         for _ in range(self.num_step_frames - 1):
             
             # Keep the button pressed for (num_step_frames - 1) frames.
             obs, _reward, _done, info = self.env.step(action)
-            # --> bonzo replace
-            #self.frame_stack.append(obs[::2, ::2, :])
-            self.frame_stack.append(downsample(obs)) # 記錄相同 action 之下的 6 個 frame
-            # <--
+            curr_obs = self.preprocess(obs)
+            self.frame_stack.append(self.diff_with_prev_obs(curr_obs))
+
 
             # 渲染這 6 個 frame
             if self.rendering:
@@ -162,23 +190,20 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             timeup = True
             if self.rd_info["curr_player_health"] > self.rd_info["curr_oppont_health"]:
                 timeup_win = True
-        
 
         # 時間到不算輸贏，只算時間到的Reward並重置變數rd_info
         if timeup:
             custom_reward = self.rewarder.fight()
             if timeup_win: self.tmp_win_rounds += 1
             else: self.tmp_lose_rounds += 1
-            round_end = True
+            self.init_rd_info()
         # Round結束，玩家輸了
-        elif self.rd_info["curr_player_health"] < 0:
+        if self.rd_info["curr_player_health"] < 0:
             custom_reward = self.rewarder.lose()    # Use the remaining health points of opponent as penalty. 
                                                    # If the opponent also has negative health points, it's a even game and the reward is +1.
             self.lose_rounds += 1
             self.tmp_lose_rounds += 1
             self.init_rd_info()
-            round_end = True
-            # print("lose")
 
         # Round結束，玩家贏了
         elif self.rd_info["curr_oppont_health"] < 0:
@@ -186,8 +211,6 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             self.win_rounds += 1
             self.tmp_win_rounds += 1
             self.init_rd_info()
-            round_end = True
-            # print("Win")
 
         # While the fighting is still going on
         else:
@@ -197,6 +220,12 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             self.rd_info["prev_countdown"] = self.rd_info["curr_countdown"]
             self.rd_info["prev_score"] = self.rd_info["curr_score"]
 
+
+        # end when round_countdown <= 0
+        ## 時間到了，但是還沒結束，所以要結束局 (但是算玩家輸嗎？算的話要移到輸了計算Loss的地方)
+        if self.rd_info["curr_countdown"] <= 0:
+            # custom_done = True
+            self.tmp_lose_rounds += 1
 
         ## 需不需要結算遊戲，看看是不是需要 reset 了
         result = self.is_end_of_game(is_reward_stage=is_reward_stage)
@@ -215,8 +244,6 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         
         if result:
             self.game_end_process()
-        elif round_end:
-            self.wait_next_round(action)
 
         if result == WIN_GAME and not self.reset_round:
             custom_done = False # reset == 0 代表 "贏的情況永不 reset"
@@ -225,15 +252,6 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         info["done_status"] = done_status
         # Max reward is 3 * full_hp = 528, norm_coefficient = 0.001, MAX_REWARD = 0.528
         return self._stack_observation(), custom_reward, custom_done, info # reward normalization
-    
-    def wait_next_round(self, action):
-        _, _, _, info = self.env.step(action)
-        prev_info = info
-        _, _, _, info = self.env.step(action)
-        # 等待 HP 恢復
-        while not (info['agent_hp'] == self.full_hp and info['enemy_hp'] == self.full_hp and info['enemy_status'] != 0):
-            prev_info = info
-            _, _, _, info = self.env.step(action)
     
     # Tools for Rewarder
     def init_rd_info(self):
@@ -248,6 +266,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         # 初始化分數
         self.rd_info["prev_score"] = 0
         self.rd_info["curr_score"] = 0
+
 
 
     # Tools
@@ -268,4 +287,3 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             return self.win_games / (self.win_games + self.lose_games)
         else:
             return -1
-    

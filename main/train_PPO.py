@@ -17,7 +17,7 @@ from args import get_args
 import retro
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from street_fighter_custom_wrapper import StreetFighterCustomWrapper
@@ -40,7 +40,7 @@ def linear_schedule(initial_value, final_value=0.0):
 
     return scheduler
 
-def make_env(game, state, seed=0):
+def make_env(game, state, rd_type="default", reset_round=1, seed=0):
     def _init():
         env = retro.make(
             game=game, 
@@ -48,7 +48,7 @@ def make_env(game, state, seed=0):
             use_restricted_actions=retro.Actions.FILTERED, 
             obs_type=retro.Observations.IMAGE    
         )
-        env = StreetFighterCustomWrapper(env)
+        env = StreetFighterCustomWrapper(env, rd_type=rd_type, reset_round=reset_round)
         env = Monitor(env)
         env.seed(seed)
         return env
@@ -65,7 +65,7 @@ def main(args):
 
     # Set up the environment and model
     game = args.game #"StreetFighterIISpecialChampionEdition-Genesis"
-    env = SubprocVecEnv([make_env(game, state=args.state, seed=i) for i in range(NUM_ENV)])
+    env = SubprocVecEnv([make_env(game, state=args.state, rd_type=args.rd_type, reset_round=args.reset_round, seed=i) for i in range(NUM_ENV)])
 
     # Start
     # Set linear scheduler for clip range
@@ -120,6 +120,19 @@ def main(args):
         # model_save_path=f"{save_dir}/{run.id}",
         # verbose=1,
     ) if not args.disable_wandb else None
+    eval_env = retro.make(game=game, 
+                          state=args.state, 
+                          use_restricted_actions=retro.Actions.FILTERED, 
+                          obs_type=retro.Observations.IMAGE    
+    )
+    eval_env = StreetFighterCustomWrapper(eval_env)
+    eval_env = Monitor(eval_env)
+    eval_callback = EvalCallback(eval_env, 
+                                 eval_freq=args.eval_steps/NUM_ENV,
+                                 deterministic=True, 
+                                 render=False,
+                                 verbose=1,
+    )
 
     # Writing the training logs from stdout to a file
     original_stdout = sys.stdout
@@ -129,7 +142,7 @@ def main(args):
     
         model.learn(
             total_timesteps=int(total_timesteps), # total_timesteps = stage_interval * num_envs * num_stages (1120 rounds)
-            callback=[checkpoint_callback1, checkpoint_callback2] if not args.disable_wandb else [checkpoint_callback1] #, stage_increase_callback]
+            callback=[checkpoint_callback1, checkpoint_callback2, eval_callback] if not args.disable_wandb else [checkpoint_callback1] #, stage_increase_callback]
         )
         env.close()
 
