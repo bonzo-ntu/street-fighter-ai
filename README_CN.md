@@ -14,6 +14,12 @@
 
 > 當使用 `pip install -r requirements.txt` 安裝時出現錯誤 "error in gym setup command: 'extras_require' must be  a dictionary whose values are strings or lists of strings containing valid project/version requirement specifiers."。  
 > 請做 `pip install setuptools==63.2.0` 以修正上述錯誤。  
+> 當使用 `pip install -r requirements.txt` 安裝時出現錯誤 "raise InvalidRequirement(str(e)) from e  
+    wheel.vendored.packaging.requirements.InvalidRequirement: Expected end or semicolon (after  
+        version specifier)  
+        opencv-python>=3.  
+        ~~~^"  
+> 請做 `pip install --upgrade pip wheel==0.38.4`
 
 > 當執行 `python test.py` 並得到以下錯誤訊息 "raise NoSuchConfigException('No standard config is available.')
 > pyglet.window.NoSuchConfigException: No standard config is available."  
