@@ -21,7 +21,7 @@ import sys
 import retro
 from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecVideoRecorder
 import wandb
 from wandb.integration.sb3 import WandbCallback
@@ -157,6 +157,19 @@ if __name__=='__main__':
         model_save_path=f"{save_dir}/{run.id}",
         #verbose=2,
     )
+    eval_env = retro.make(game=game, 
+                          state="Champion.Level12.RyuVsBison", 
+                          use_restricted_actions=retro.Actions.FILTERED, 
+                          obs_type=retro.Observations.IMAGE    
+    )
+    eval_env = StreetFighterCustomWrapper(eval_env)
+    eval_env = Monitor(eval_env)
+    eval_callback = EvalCallback(eval_env, 
+                                 eval_freq=10000/NUM_ENV,
+                                 deterministic=True, 
+                                 render=False,
+                                 verbose=1,
+    )
 
     # Writing the training logs from stdout to a file
     original_stdout = sys.stdout
@@ -166,7 +179,7 @@ if __name__=='__main__':
     
         model.learn(
             total_timesteps=config['total_timesteps'], # total_timesteps = stage_interval * num_envs * num_stages (1120 rounds)
-            callback=[wandb_callback, checkpoint_callback],#, stage_increase_callback]
+            callback=[wandb_callback, checkpoint_callback, eval_callback],#, stage_increase_callback]
         )
         env.close()
 
