@@ -23,8 +23,12 @@ class CustomRewarder:
 
         if self.rd_type == "default":
             return default_keys
-        elif self.rd_type == "custom":
+        elif self.rd_type == "time":
             return default_keys + ["init_countdown", "curr_countdown"]
+        elif self.rd_type == "score":
+            return ["prev_score", "curr_score"]
+        elif self.rd_type == "time+score":
+            return ["init_countdown", "curr_countdown"] + ["prev_score", "curr_score"]
         else:
             raise ValueError(f"rd_type should be {self.get_available_rd_types()}")
     
@@ -38,22 +42,38 @@ class CustomRewarder:
             lose = default_lose
             win = default_win
             fight = default_fight
-        elif self.rd_type == "custom": # 自訂的 Reward 
+        elif self.rd_type == "time": # 自訂的 Reward 
             countdown_coeff = self.curr_info_dict["curr_countdown"] / self.curr_info_dict["init_countdown"]
             lose = default_lose * countdown_coeff
             win = default_win * countdown_coeff
             fight = default_fight * countdown_coeff
+        elif self.rd_type == "score":
+            score = self.curr_info_dict["curr_score"] - self.curr_info_dict["prev_score"]
+            lose = score
+            win = score
+            fight = score
+        elif self.rd_type == "time+score":
+            score = self.curr_info_dict["curr_score"] - self.curr_info_dict["prev_score"]
+            countdown_coeff = self.curr_info_dict["curr_countdown"] / self.curr_info_dict["init_countdown"]
+            lose = score * countdown_coeff
+            win = score * countdown_coeff
+            fight = score * countdown_coeff
         else:
             raise ValueError(f"rd_type should be {self.get_available_rd_types()}")
         
         return lose, win, fight
     
     def norm(self, rd):
+        # 因為已經跑實驗了，所以就把 Normalized 的 Reward 上界定成 0.5
         default_norm = 0.001
         if self.rd_type == "default":
             norm = default_norm
-        elif self.rd_type == "custom":
-            norm = default_norm # TBD
+        elif self.rd_type == "time":
+            norm = default_norm
+        elif self.rd_type == "score":
+            norm = 1 # 分數沒有明顯上下界，所以就不 normalize 了
+        elif self.rd_type == "time+score":
+            norm = 1 # 分數沒有明顯上下界，所以就不 normalize 了
         return rd * norm
 
     ## Update curr_info_dict
@@ -72,4 +92,4 @@ class CustomRewarder:
     ## Tools
     @staticmethod
     def get_available_rd_types():
-        return ["default", "custom"]
+        return ["default", "time", "score", "time+score"]

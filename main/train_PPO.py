@@ -129,7 +129,7 @@ def main(args):
     
         model.learn(
             total_timesteps=int(total_timesteps), # total_timesteps = stage_interval * num_envs * num_stages (1120 rounds)
-            callback=[checkpoint_callback1, checkpoint_callback2] #, stage_increase_callback]
+            callback=[checkpoint_callback1, checkpoint_callback2] if not args.disable_wandb else [checkpoint_callback1] #, stage_increase_callback]
         )
         env.close()
 
