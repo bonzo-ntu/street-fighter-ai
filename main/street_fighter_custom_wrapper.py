@@ -168,13 +168,14 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             custom_reward = self.rewarder.fight()
             if timeup_win: self.tmp_win_rounds += 1
             else: self.tmp_lose_rounds += 1
-            self.init_rd_info()
+            self.wait_next_round(action)
         # Round結束，玩家輸了
-        if self.rd_info["curr_player_health"] < 0:
+        elif self.rd_info["curr_player_health"] < 0:
             custom_reward = self.rewarder.lose()    # Use the remaining health points of opponent as penalty. 
                                                    # If the opponent also has negative health points, it's a even game and the reward is +1.
             self.lose_rounds += 1
             self.tmp_lose_rounds += 1
+            self.wait_next_round(action)
             self.init_rd_info()
 
         # Round結束，玩家贏了
@@ -182,6 +183,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             custom_reward = self.rewarder.win()
             self.win_rounds += 1
             self.tmp_win_rounds += 1
+            self.wait_next_round(action)
             self.init_rd_info()
 
         # While the fighting is still going on
@@ -219,6 +221,12 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         # Max reward is 3 * full_hp = 528, norm_coefficient = 0.001, MAX_REWARD = 0.528
         return self._stack_observation(), custom_reward, custom_done, info # reward normalization
     
+    def wait_next_round(self, action):
+        _, _, _, info = self.env.step(action)
+        # 等待 HP 恢復
+        while not (info['agent_hp'] == self.full_hp and info['enemy_hp'] == self.full_hp and info['enemy_status'] != 0):
+            _, _, _, info = self.env.step(action)
+    
     # Tools for Rewarder
     def init_rd_info(self):
         # 初始化血量
@@ -232,7 +240,6 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         # 初始化分數
         self.rd_info["prev_score"] = 0
         self.rd_info["curr_score"] = 0
-
 
 
     # Tools
