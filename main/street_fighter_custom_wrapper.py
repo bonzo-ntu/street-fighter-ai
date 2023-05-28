@@ -19,6 +19,8 @@ import gym
 import numpy as np
 
 NUM_STAGES = 12
+WIN_GAME, LOSE_GAME = 1, -1
+BONUS_END = 2
 
 # --> bonzo add
 def downsample(input, rate=2):
@@ -28,6 +30,7 @@ def downsample(input, rate=2):
 # Custom environment wrapper
 class StreetFighterCustomWrapper(gym.Wrapper):
     def __init__(self, env, rd_type="default", reset_round=1, rendering=False):
+        assert reset_round in [0, 1, 3] # [no_reset, 1/1, 3/2]
         super(StreetFighterCustomWrapper, self).__init__(env)
         self.env = env
         self.env.reset()
@@ -60,7 +63,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         self.win_rounds, self.lose_rounds = 0, 0
         self.is_in_ending = False
         self.tmp_win_rounds, self.tmp_lose_rounds = 0, 0
-        self.reset_condition = self.reset_round/2
+        self.reset_condition = self.reset_round/2 if reset_round != 0 else 3/2 # noreset時，三戰兩勝輸的時候還是要Reset
 
         ## 記錄過幾關
         self.stages = 0
@@ -95,10 +98,12 @@ class StreetFighterCustomWrapper(gym.Wrapper):
     def step(self, action):
         custom_done = False
         is_reward_stage = False
+        done_status = 0 # 用於回傳給外部計算勝率用的 done_status
 
         obs, _reward, _done, info = self.env.step(action)
         ## "永不 reset" 情況下，但是全通關，就要 reset
         if not self.reset_round and self.stages >= NUM_STAGES:
+            info["done_status"] = 1
             return self._stack_observation(), 0, True, info
         
         # 時間沒在動 = 跑動畫，所以跳過 # "永不 reset" 情況下可能全通關造成無窮迴圈，但是上面排除了全通關的情況
@@ -150,21 +155,34 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         #####  計算 Reward  #####
         # custom_done: 用於訓練最後一關第一局
         # Round is over and player loses.
+        ## 時間到了，但是還沒結束，所以要結束 Round
+        timeup, timeup_win = False, False
+        if self.rd_info["curr_countdown"] <= 0 and not is_reward_stage:
+            timeup = True
+            if self.rd_info["curr_player_health"] > self.rd_info["curr_oppont_health"]:
+                timeup_win = True
+        
+
+        # 時間到不算輸贏，只算時間到的Reward並重置變數rd_info
+        if timeup:
+            custom_reward = self.rewarder.fight()
+            if timeup_win: self.tmp_win_rounds += 1
+            else: self.tmp_lose_rounds += 1
+            self.init_rd_info()
+        # Round結束，玩家輸了
         if self.rd_info["curr_player_health"] < 0:
             custom_reward = self.rewarder.lose()    # Use the remaining health points of opponent as penalty. 
                                                    # If the opponent also has negative health points, it's a even game and the reward is +1.
             self.lose_rounds += 1
             self.tmp_lose_rounds += 1
+            self.init_rd_info()
 
-        # Round is over and player wins.
+        # Round結束，玩家贏了
         elif self.rd_info["curr_oppont_health"] < 0:
-            # custom_reward = curr_player_health * self.reward_coeff # Use the remaining health points of player as reward.
-                                                                   # Multiply by reward_coeff to make the reward larger than the penalty to avoid cowardice of agent.
-
-            # custom_reward = math.pow(self.full_hp, (5940 - self.total_timesteps) / 5940) * self.reward_coeff # Use the remaining time steps as reward.
             custom_reward = self.rewarder.win()
             self.win_rounds += 1
             self.tmp_win_rounds += 1
+            self.init_rd_info()
 
         # While the fighting is still going on
         else:
@@ -173,33 +191,31 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             self.rd_info["prev_oppont_health"] = self.rd_info["curr_oppont_health"]
             self.rd_info["prev_countdown"] = self.rd_info["curr_countdown"]
             self.rd_info["prev_score"] = self.rd_info["curr_score"]
-            custom_done = False
 
-
-        # end when round_countdown <= 0
-        ## 時間到了，但是還沒結束，所以要結束局 (但是算玩家輸嗎？算的話要移到輸了計算Loss的地方)
-        if self.rd_info["curr_countdown"] <= 0:
-            # custom_done = True
-            self.tmp_lose_rounds += 1
 
         ## 需不需要結算遊戲，看看是不是需要 reset 了
-        result = self.is_end_of_game()
-        if result == 1: ## 贏GAME
+        result = self.is_end_of_game(is_reward_stage=is_reward_stage)
+        if result == WIN_GAME: ## 贏GAME
             self.win_games += 1
             self.stages += 1
             custom_done = True
-        elif result == -1: ## 輸GAME
+            done_status = 1
+        elif result == LOSE_GAME: ## 輸GAME
             self.lose_games += 1
             self.stages = 0
             custom_done = True
+            done_status = -1
+        elif result == BONUS_END: # BONUS關贏了就是一Round一關結束，但是不算關卡數，且需要game_end_process並繼續
+            pass
+        
         if result:
             self.game_end_process()
+
+        if result == WIN_GAME and not self.reset_round:
+            custom_done = False # reset == 0 代表 "贏的情況永不 reset"
+            done_status = 0
         
-        # When reset_round flag is set to False (never reset), the session should always keep going.
-        # reset == 0 代表 "永不 reset"
-        if not self.reset_round:
-            custom_done = False
-             
+        info["done_status"] = done_status
         # Max reward is 3 * full_hp = 528, norm_coefficient = 0.001, MAX_REWARD = 0.528
         return self._stack_observation(), custom_reward, custom_done, info # reward normalization
     
@@ -225,9 +241,10 @@ class StreetFighterCustomWrapper(gym.Wrapper):
     def game_end_process(self):
         self.tmp_lose_rounds, self.tmp_win_rounds = 0, 0
         self.init_rd_info()
-    def is_end_of_game(self):
-        if self.tmp_lose_rounds > self.reset_condition: return -1
-        elif self.tmp_win_rounds > self.reset_condition: return 1
+    def is_end_of_game(self, is_reward_stage=False):
+        if is_reward_stage and self.rd_info["curr_countdown"] <= 0: return BONUS_END
+        if self.tmp_lose_rounds > self.reset_condition: return LOSE_GAME
+        elif self.tmp_win_rounds > self.reset_condition: return WIN_GAME
         else: return 0
     def winrate(self, how_count="round"):
         if how_count == "round":
