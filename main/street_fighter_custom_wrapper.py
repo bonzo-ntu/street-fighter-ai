@@ -99,6 +99,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         custom_done = False
         is_reward_stage = False
         done_status = 0 # 用於回傳給外部計算勝率用的 done_status
+        round_end = False
 
         obs, _reward, _done, info = self.env.step(action)
         ## "永不 reset" 情況下，但是全通關，就要 reset
@@ -168,23 +169,25 @@ class StreetFighterCustomWrapper(gym.Wrapper):
             custom_reward = self.rewarder.fight()
             if timeup_win: self.tmp_win_rounds += 1
             else: self.tmp_lose_rounds += 1
-            self.wait_next_round(action)
+            round_end = True
         # Round結束，玩家輸了
         elif self.rd_info["curr_player_health"] < 0:
             custom_reward = self.rewarder.lose()    # Use the remaining health points of opponent as penalty. 
                                                    # If the opponent also has negative health points, it's a even game and the reward is +1.
             self.lose_rounds += 1
             self.tmp_lose_rounds += 1
-            self.wait_next_round(action)
             self.init_rd_info()
+            round_end = True
+            print("lose")
 
         # Round結束，玩家贏了
         elif self.rd_info["curr_oppont_health"] < 0:
             custom_reward = self.rewarder.win()
             self.win_rounds += 1
             self.tmp_win_rounds += 1
-            self.wait_next_round(action)
             self.init_rd_info()
+            round_end = True
+            print("Win")
 
         # While the fighting is still going on
         else:
@@ -212,6 +215,8 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         
         if result:
             self.game_end_process()
+        elif round_end:
+            self.wait_next_round(action)
 
         if result == WIN_GAME and not self.reset_round:
             custom_done = False # reset == 0 代表 "贏的情況永不 reset"
@@ -226,8 +231,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         prev_info = info
         _, _, _, info = self.env.step(action)
         # 等待 HP 恢復
-        while not (info['agent_hp'] == self.full_hp and info['enemy_hp'] == self.full_hp and info['enemy_status'] != 0 and \
-                   prev_info['round_countdown'] - info['round_countdown'] != 0):
+        while not (info['agent_hp'] == self.full_hp and info['enemy_hp'] == self.full_hp and info['enemy_status'] != 0):
             prev_info = info
             _, _, _, info = self.env.step(action)
     
