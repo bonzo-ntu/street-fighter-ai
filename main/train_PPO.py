@@ -40,7 +40,7 @@ def linear_schedule(initial_value, final_value=0.0):
 
     return scheduler
 
-def make_env(game, state, seed=0):
+def make_env(game, state, rd_type="default", reset_round=1, seed=0):
     def _init():
         env = retro.make(
             game=game, 
@@ -48,7 +48,7 @@ def make_env(game, state, seed=0):
             use_restricted_actions=retro.Actions.FILTERED, 
             obs_type=retro.Observations.IMAGE    
         )
-        env = StreetFighterCustomWrapper(env)
+        env = StreetFighterCustomWrapper(env, rd_type=rd_type, reset_round=reset_round)
         env = Monitor(env)
         env.seed(seed)
         return env
@@ -65,7 +65,7 @@ def main(args):
 
     # Set up the environment and model
     game = args.game #"StreetFighterIISpecialChampionEdition-Genesis"
-    env = SubprocVecEnv([make_env(game, state=args.state, seed=i) for i in range(NUM_ENV)])
+    env = SubprocVecEnv([make_env(game, state=args.state, rd_type=args.rd_type, reset_round=args.reset_round, seed=i) for i in range(NUM_ENV)])
 
     # Start
     # Set linear scheduler for clip range
