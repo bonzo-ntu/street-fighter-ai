@@ -37,12 +37,12 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         self.init_info = self.get_curr_all_info()
 
         # Use a deque to store the last 9 frames
-        self.num_frames = 9
+        self.num_frames = 4
         self.frame_stack = collections.deque(maxlen=self.num_frames)
 
-        self.num_step_frames = 6
+        self.num_step_frames = 1
 
-        self.reward_coeff = 3.0
+        self.reward_coeff = 2.7
 
         self.total_timesteps = 0
 
@@ -71,7 +71,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
     
     def _stack_observation(self):
         # 拿 frame 2 的 R + frame 5 的 G + frame 8 的 B 串在一起
-        return np.stack([self.frame_stack[i * 3 + 2][:, :, i] for i in range(3)], axis=-1)
+        return np.stack([self.frame_stack[i + 1][:, :, i] for i in range(3)], axis=-1)
 
     def reset(self):
         observation = self.env.reset()
