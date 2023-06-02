@@ -22,7 +22,7 @@ class CustomRewarder:
 
         if self.rd_type == "default":
             return default_keys
-        elif self.rd_type == "time":
+        elif self.rd_type == "time" or self.rd_type == "time2":
             return default_keys + ["init_countdown", "curr_countdown"]
         elif self.rd_type == "score":
             return ["prev_score", "curr_score"]
@@ -37,9 +37,9 @@ class CustomRewarder:
 
         if self.rd_type == "default": # 林亦原本的 Reward
             lose = default_lose
-        elif self.rd_type == "time": # 自訂的 Reward 
-            countdown_coeff = self.curr_info_dict["curr_countdown"] / self.curr_info_dict["init_countdown"]
-            lose = default_lose * countdown_coeff
+        elif self.rd_type == "time" or self.rd_type == "time2": # 自訂的 Reward 
+            # countdown_coeff = (1+self.curr_info_dict["curr_countdown"] / self.curr_info_dict["init_countdown"])
+            lose = default_lose #* countdown_coeff
         elif self.rd_type == "score":
             score = self.curr_info_dict["curr_score"] - self.curr_info_dict["prev_score"]
             lose = score
@@ -58,9 +58,9 @@ class CustomRewarder:
         
         if self.rd_type == "default": # 林亦原本的 Reward
             win = default_win
-        elif self.rd_type == "time": # 自訂的 Reward 
-            countdown_coeff = self.curr_info_dict["curr_countdown"] / self.curr_info_dict["init_countdown"]
-            win = default_win * countdown_coeff
+        elif self.rd_type == "time" or self.rd_type == "time2": # 自訂的 Reward 
+            # countdown_coeff = (1+self.curr_info_dict["curr_countdown"] / self.curr_info_dict["init_countdown"])
+            win = default_win #* countdown_coeff
         elif self.rd_type == "score":
             score = self.curr_info_dict["curr_score"] - self.curr_info_dict["prev_score"]
             win = score
@@ -80,8 +80,18 @@ class CustomRewarder:
         if self.rd_type == "default": # 林亦原本的 Reward
             fight = default_fight
         elif self.rd_type == "time": # 自訂的 Reward 
-            countdown_coeff = self.curr_info_dict["curr_countdown"] / self.curr_info_dict["init_countdown"]
-            fight = default_fight * countdown_coeff
+            countdown_coeff = (1+self.curr_info_dict["curr_countdown"] / self.curr_info_dict["init_countdown"])
+            countdown_punish = 1 - countdown_coeff
+            # fight = self.rd_coeff * (self.curr_info_dict["prev_oppont_health"] - self.curr_info_dict["curr_oppont_health"]) * countdown_coeff - \
+                        # (self.curr_info_dict["prev_player_health"] - self.curr_info_dict["curr_player_health"]) - \
+                        # 176/10 #* countdown_punish
+            fight = default_fight * countdown_coeff - 176/10
+        elif self.rd_type == "time2":
+            countdown_coeff = (1+self.curr_info_dict["curr_countdown"] / self.curr_info_dict["init_countdown"])
+            countdown_punish = 1 - countdown_coeff
+            fight = self.rd_coeff * (self.curr_info_dict["prev_oppont_health"] - self.curr_info_dict["curr_oppont_health"]) * countdown_coeff - \
+                        (self.curr_info_dict["prev_player_health"] - self.curr_info_dict["curr_player_health"]) - \
+                        176/5 * countdown_punish
         elif self.rd_type == "score":
             score = self.curr_info_dict["curr_score"] - self.curr_info_dict["prev_score"]
             fight = score
@@ -99,8 +109,8 @@ class CustomRewarder:
         default_norm = 0.001
         if self.rd_type == "default":
             norm = default_norm
-        elif self.rd_type == "time":
-            norm = default_norm
+        elif self.rd_type == "time" or self.rd_type == "time2":
+            norm = default_norm/2
         elif self.rd_type == "score":
             norm = 1 # 分數沒有明顯上下界，所以就不 normalize 了
         elif self.rd_type == "time+score":
@@ -127,4 +137,4 @@ class CustomRewarder:
     ## Tools
     @staticmethod
     def get_available_rd_types():
-        return ["default", "time", "score", "time+score"]
+        return ["default", "time", "time2", "score", "time+score"]

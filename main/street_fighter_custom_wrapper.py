@@ -40,9 +40,9 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         self.num_frames = 9
         self.frame_stack = collections.deque(maxlen=self.num_frames)
 
-        self.num_step_frames = 6
+        self.num_step_frames = 1
 
-        self.reward_coeff = 3.0
+        self.reward_coeff = 3
 
         self.total_timesteps = 0
 
@@ -71,7 +71,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
     
     def _stack_observation(self):
         # 拿 frame 2 的 R + frame 5 的 G + frame 8 的 B 串在一起
-        return np.stack([self.frame_stack[i * 3 + 2][:, :, i] for i in range(3)], axis=-1)
+        return np.stack([self.frame_stack[i*3 + 2][:, :, i] for i in range(3)], axis=-1)
 
     def reset(self):
         observation = self.env.reset()
@@ -110,6 +110,7 @@ class StreetFighterCustomWrapper(gym.Wrapper):
         # 時間沒在動 = 跑動畫，所以跳過 # "永不 reset" 情況下可能全通關造成無窮迴圈，但是上面排除了全通關的情況
         while self.rd_info["curr_countdown"] - self.rd_info["prev_countdown"] == 0:
             obs, _, _, info = self.env.step(action)
+            # obs, _, _, info = self.env.step(action)
             self.rd_info["prev_countdown"] = self.rd_info["curr_countdown"]
             self.rd_info["curr_countdown"] = info['round_countdown']
             #print("SKIP")
